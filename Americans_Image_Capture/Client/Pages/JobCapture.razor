@@ -1,0 +1,224 @@
+﻿
+@page "/image"
+@using Americans_Image_Capture.Client.Utitlity
+@using static Americans_Image_Capture.Client.Pages.LoginVC
+@inject HttpClient HttpClient
+
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+
+<MudContainer Style="height: 100%; width: 100%; overflow-y: hidden; overflow-x: hidden;">
+    <MudGrid Class="d-flex flex-wrap justify-around" Spacing="3">
+        <!-- Location Field -->
+        <MudItem md="6" sm="12" xs="12" Class="mb-2">
+            <MudSelect T="string" Label="Location" Variant="Variant.Outlined" @bind-Value="maagimage.Location">
+                @foreach (var location in LocationList)
+                {
+                    <MudSelectItem Value="@location">@location</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <!-- Department Field -->
+        <MudItem md="6" sm="12" xs="12" Class="mb-2">
+            <MudSelect T="string" Label="Department" Variant="Variant.Outlined" @bind-Value="maagimage.Department">
+                @foreach (var department in departmentList)
+                {
+                    <MudSelectItem Value="@department">@department</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+     
+
+        <!-- Row 3: Project/Kent and Photo Upload -->
+        <MudItem md="6" sm="12" xs="12" Class="mb-2">
+            <MudTextField T="string" Label="Project/Kent" Variant="Variant.Outlined" @bind-Value="maagimage.ProjectKent" />
+        </MudItem>
+
+        <MudItem md="6" sm="12" xs="12" Class="d-flex align-center flex-column">
+            <div style="border: 2px solid gray; padding: 10px; text-align: center; width: 100%;">
+                <p>Please select photos</p>
+                <InputFile OnChange="HandleImageSelection" accept="image/*" multiple />
+            </div>
+            <MudButton Class="mt-2" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveToFolder">
+                Browse Folder To Save Images
+            </MudButton>
+        </MudItem>
+
+        <!-- Selected Images Preview -->
+        @if (selectedImages.Count > 0)
+        {
+            <MudItem md="12" sm="12" xs="12" Class="d-flex justify-center mb-4">
+                <MudGrid Spacing="2">
+                    @foreach (var image in selectedImages)
+                    {
+                        <MudItem md="3" sm="6" xs="12" Class="mb-2 center">
+                            <img src="@image.PreviewUrl" alt="Selected Image" style="max-width: 100%; max-height: 200px;" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <!-- Submit Button -->
+    <MudGrid>
+        <MudItem xs="12" Class="d-flex justify-end mt-4">
+            <MudButton Size="Size.Medium" Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitForm">SUBMIT</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<style>
+    .center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+
+@code{
+
+    public MaagAmericansImage maagimage = new MaagAmericansImage
+        {
+            Images = new List<Imagedata>()  // Assuming Images is a List<Image>
+        };
+
+    private List<ImagePreview> selectedImages = new List<ImagePreview>();
+
+    private List<string> departmentList = new List<string>
+    {
+        "Assembly",
+        "Welding",
+        "Laser"
+    };
+
+    private List<string> LocationList = new List<string>
+    {
+        "Kent",
+        "Eagle Rock"
+    };
+
+    private string currentUsername;
+
+    private async Task HandleImageSelection(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles())
+        {
+            using var stream = file.OpenReadStream();
+            var buffer = new byte[file.Size];
+            await stream.ReadAsync(buffer, 0, (int)file.Size);
+
+            var base64Data = Convert.ToBase64String(buffer); // Convert to Base64
+
+            // Add to the list of selected images
+            selectedImages.Add(new ImagePreview
+                {
+                    PreviewUrl = $"data:{file.ContentType};base64,{base64Data}",
+                    File = file,
+                    Base64Data = base64Data
+                });
+        }
+    }     
+
+
+    private async Task SaveToFolder()
+    {
+        if (selectedImages.Count == 0)
+        {
+            Snackbar.Add("No images selected to save.", Severity.Warning);
+            return;
+        }
+
+        // Prepare a list of images with their names and base64 data
+        var filesToSave = selectedImages.Select(img => new
+        {
+            name = img.File.Name,
+            base64Data = img.Base64Data
+        }).ToList();
+
+        // Call the JavaScript function and pass the files to save, expecting file paths in return
+        var savedFilePaths = await JSRuntime.InvokeAsync<List<string>>("selectFolderAndSaveFiles", filesToSave);
+
+        // If files were saved, update selected images with paths
+        if (savedFilePaths != null && savedFilePaths.Any())
+        {
+            for (int i = 0; i < selectedImages.Count; i++)
+            {
+                selectedImages[i].FilePath = savedFilePaths[i]; // Add the saved file path to each image
+            }
+
+          //  Snackbar.Add("Files saved successfully.", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add("Failed to save files.", Severity.Error);
+        }
+    }
+
+    private async Task SubmitForm()
+    {
+        var userData = await localStorage.GetItemAsync<UserPagesAndRouter>("UserData");
+
+        currentUsername = userData?.UserName;
+
+        if (string.IsNullOrEmpty(maagimage.ProjectKent) || string.IsNullOrEmpty(maagimage.Department))
+        {
+            Snackbar.Add("Please fill in all the required fields.", Severity.Error);
+            return;
+        }
+
+        if (selectedImages.Count == 0)
+        {
+            Snackbar.Add("No images selected for submission.", Severity.Warning);
+            return;
+        }
+
+        // Prepare the form data to send to the API
+        var formData = new MaagAmericansImage
+            {
+                Location = maagimage.Location,
+                Department = maagimage.Department,
+                Username = currentUsername,  // Set the current user, or pass as needed
+                Date = DateTime.Now,        // Set the current date
+                ProjectKent = maagimage.ProjectKent,
+                Images = selectedImages.Select(img => new Imagedata
+                {
+                    // Now store the actual file path (from the JavaScript return value)
+                    ImageFilePath = img.FilePath  // Use the saved file path
+                }).ToList()
+            };
+
+        try
+        {
+            var response = await HttpClient.PostAsJsonAsync(ApiConstants.AddimageDetails, formData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Images submitted successfully!", Severity.Success);
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Submission failed: {errorMessage}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+
+    public class ImagePreview
+    {
+        public string PreviewUrl { get; set; }
+        public IBrowserFile File { get; set; }
+        public string Base64Data { get; set; }
+        public string FilePath { get; set; }  // Add this property for storing the file path
+    }
+
+}

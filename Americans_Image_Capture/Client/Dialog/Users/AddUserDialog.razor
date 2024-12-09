@@ -1,0 +1,175 @@
+﻿
+@using Americans_Image_Capture.Client.Utitlity
+@using Americans_Image_Capture.Shared.Models
+@using Americans_Image_Capture.Shared;
+@using Newtonsoft.Json
+@using System.Text
+@using Americans_Image_Capture.Shared.DTOs
+@using Americans_Image_Capture.Shared.Entities
+@using System.Net
+@using System.ComponentModel.DataAnnotations;
+
+@inject ISnackbar Snackbar
+@inject HttpClient HttpClient
+@inject IDialogCompletionService CompletionService
+
+
+<div>
+    <MudDialog>
+        <TitleContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-3 mb-n1" />
+                Add User
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField MaxLength="250" Immediate="true" Validation="@(new Func<string, IEnumerable<string>>(MaxCharacters))"
+                          Label="User Name" @bind-Value="user.username" Variant="Variant.Outlined" class="mb-4" />
+            <MudTextField MaxLength="250" Immediate="true" Validation="@(new Func<string, IEnumerable<string>>(MaxCharacters))"
+                          Label="Name" @bind-Value="user.Name" Variant="Variant.Outlined" class="mb-4" />
+            <MudTextField MaxLength="250" Immediate="true" Validation="@(new Func<string, IEnumerable<string>>(MaxCharacters))"
+                          Label="User Code" @bind-Value="user.Usercode" Variant="Variant.Outlined" class="mb-4" />
+            <MudTextField MaxLength="250" Immediate="true" Validation="@(new Func<string, IEnumerable<string>>(MaxCharacters))"
+                          Label="Email" @bind-Value="user.Email" Variant="Variant.Outlined" class="mb-4" />
+          @*   <div class="mb-4">
+                <MudSelect Variant="Variant.Outlined" Label="Page Priviliges" MultiSelection="true" @bind-Value="user.PageNames">
+
+                    @foreach (var pr in pages)
+                    {
+                        <MudSelectItem Value="@pr">@pr</MudSelectItem>
+                    }
+                </MudSelect>
+            </div> *@
+            @* <div class="mb-4">
+            <MudSelect Variant="Variant.Outlined" @bind-Value="user.Role" AnchorOrigin="Origin.BottomCenter" Label="Role" OpenIcon="@Icons.Material.Filled.Person" AdornmentColor="Color.Primary">
+            @foreach (var role in appRoles)
+            {
+            <MudSelectItem Value="@role.Name" Style="padding-bottom: 8px;">@role.Name</MudSelectItem>
+            }
+            </MudSelect>
+            </div> *@
+        </DialogContent>
+        <DialogActions>
+            <MudButton Class="mr-4 mb-2" Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="Add">Add</MudButton>
+            @* <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Error" OnClick="Cancel">Cancel</MudButton> *@
+        </DialogActions>
+    </MudDialog>
+</div>
+
+@code {
+     [CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+    // private IEnumerable<AppRole> appRoles = new List<AppRole>();
+
+    private IEnumerable<string> MaxCharacters(string ch)
+    {
+        if (!string.IsNullOrEmpty(ch) && 250 <= ch?.Length)
+            yield return "Max 250 characters";
+    }
+
+    // private string[] pages =
+    // {
+    // "Job Image Capture", "Records","Manage User",
+    // };
+
+    // public Dictionary<string, string> pagePrevlgs = new Dictionary<string, string>
+    //  {
+
+    //      { "Job Image Capture", "/sqvc"},
+    //      { "Records", "/mpvc" },
+    //      { "Manage User", "/projects" },
+
+    //  };
+
+    private string value { get; set; } = "Nothing selected";
+    private IEnumerable<string> options { get; set; } = new HashSet<string>();
+
+    public event EventHandler CompletedChanged;
+    public UserAddDto user = new UserAddDto();
+
+    private bool _isCompleted;
+    public bool IsCompleted
+    {
+        get => _isCompleted;
+        set
+        {
+            _isCompleted = value;
+            CompletedChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+
+    private async Task Add()
+    {
+        Snackbar.Clear();
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopCenter;
+
+      
+
+        // user.Routes = string.Join(", ", user.PageNames.Split(',').Select(page => pagePrevlgs[page.Trim()]));
+        // var selectedPageList = string.Join(", ", options.Select(x => $"\"{x}\""));
+
+        var validationResults = new List<ValidationResult>();
+        var validationContext = new ValidationContext(user);
+
+        if (!Validator.TryValidateObject(user, validationContext, validationResults, true))
+        {
+            foreach (var validationResult in validationResults)
+            {
+                Snackbar.Add(validationResult.ErrorMessage, Severity.Error);
+            }
+            return;
+        }
+
+        try
+        {
+            var jsonPart = JsonConvert.SerializeObject(user);
+
+            var content = new StringContent(jsonPart, Encoding.UTF8, "application/json");
+
+            //var response = await HttpClient.PostAsync("
+            // /api/Users/Ua", content);
+           // var response = await HttpClient.PostAsync("https://localhost:7146/api/users/adduser", content);
+            var response = await HttpClient.PostAsJsonAsync(ApiConstants.LoginUserDetails, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("User added successfully.", Severity.Success);
+                MudDialog.Close();
+                CompletionService.IsCompleted = true;
+
+            }
+            else
+            {
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"{errorMessage}", Severity.Error);
+                CompletionService.IsCompleted = false;
+                MudDialog.Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error Occurred: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
+
+    private async Task LoadRoles()
+    {
+        try
+        {
+           
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error Occured {ex.Message}", Severity.Warning);
+        }
+    }
+}

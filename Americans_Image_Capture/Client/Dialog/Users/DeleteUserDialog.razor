@@ -1,0 +1,78 @@
+﻿@using Americans_Image_Capture.Client.Utitlity
+@using Americans_Image_Capture.Shared.Models
+@using System.ComponentModel.DataAnnotations;
+@using Americans_Image_Capture.Shared.Entities
+@using Americans_Image_Capture.Shared.DTOs
+
+@inject ISnackbar Snackbar
+@inject HttpClient HttpClient
+@inject IDialogCompletionService CompletionService
+
+<div>
+    <MudDialog>
+        <TitleContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.PersonRemove" Class="mr-3 mb-n1" />
+                Delete User ?
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField Label="User Name" @bind-Value="@appUsers.UserName" Variant="Variant.Outlined" Class="mb-4" ReadOnly />
+            <MudTextField Label="Name" @bind-Value="@appUsers.Name" Variant="Variant.Outlined" Class="mb-4" ReadOnly />
+            <MudTextField Label="User Code" @bind-Value="@appUsers.UserCode" Variant="Variant.Outlined" Class="mb-4" ReadOnly />
+            <MudTextField Label="Email" @bind-Value="@appUsers.Email" Variant="Variant.Outlined" Class="mb-4" ReadOnly />
+             </DialogContent>
+        <DialogActions>
+            <MudButton Class="mr-4 mb-2" Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="Delete">Delete</MudButton>
+            @* <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Error" OnClick="Cancel">Cancel</MudButton> *@
+        </DialogActions>
+    </MudDialog>
+</div>
+
+@code {
+    [CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+    [Parameter] public AppUser appUsers { get; set; } = new AppUser();
+   
+    public UserAddDto user = new UserAddDto();
+
+    private async Task Delete()
+    {
+        try
+        {
+            Snackbar.Clear();
+            Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopCenter;
+
+            var userName = appUsers.UserName.ToLower(); // Ensure consistent casing
+          //  HttpResponseMessage response = await HttpClient.DeleteAsync($"https://localhost:7146/api/Users/{userName}");
+          
+            HttpResponseMessage response = await HttpClient.DeleteAsync($"{ApiConstants.LoginUserDelete}/{userName}");
+
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("User deleted successfully.", Severity.Success);
+                CompletionService.IsCompleted = true;
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to delete user: {errorMessage}", Severity.Error);
+                CompletionService.IsCompleted = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error Occurred: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            MudDialog?.Close();
+        }
+    }
+
+
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+}

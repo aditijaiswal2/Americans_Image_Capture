@@ -1,0 +1,157 @@
+﻿@page "/adduser"
+
+@using Americans_Image_Capture.Client.Dialog.Users
+@using Americans_Image_Capture.Client.Pages.Account;
+@using Americans_Image_Capture.Client.Utitlity
+@using Americans_Image_Capture.Shared.DTOs
+@using Americans_Image_Capture.Shared.Entities
+@inject IDialogService DialogService
+@inject HttpClient HttpClient
+
+
+@inherits BaseAuthentication
+@inject ISnackbar Snackbar
+
+
+
+
+
+@if (BaseAuthentication.IsAuthenticated)
+{
+     <MudContainer Class="pa-2" Fixed="true" Style="height: calc(100vh);">
+        <MudGrid Class="d-flex justify-content-around">
+            <MudItem md="12" sm="12" xs="12" class="mt-4 ml-2">
+                <MudText Typo="Typo.h6" Style="font-size: 16px;">USERS</MudText>
+            </MudItem>
+            <MudItem md="12" sm="12" xs="12" class="mb-2 ml-2" Style="margin-top:-10px">
+                <MudItem md="11" sm="12" xs="12">
+                    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" OnClick="@AddUser">ADD</MudButton>
+                </MudItem>
+                <br />
+                <div style="max-height: 500px; max-width:100%;">
+                    <MudTable Items="@appUsers" Class="table table-bordered table-striped mt-2">
+                        <HeaderContent>
+                            <MudTh Style="text-align:center;width:150px">User Name</MudTh>
+                          
+                            <MudTh Style="text-align:center;width:100px">User Code</MudTh>
+                            <MudTh Style="text-align:center;width:200px">Email</MudTh>
+                          @*   <MudTh Style="text-align:center;width:250px">Page Privileges</MudTh>        *@                    
+                            <MudTh Style="text-align:center;width:200px">Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="appUsers">
+                            <MudTd Class="table-data-alignment">@appUsers.Name</MudTd>
+                            <MudTd Class="table-data-alignment">@appUsers.UserCode</MudTd>
+                            <MudTd Class="table-data-alignment">@appUsers.Email</MudTd>
+                           @*  <MudTd Class="table-data-alignment">@appUsers.PageNames</MudTd>
+                           *@
+                            <MudTd Class="table-data-alignment">
+                               @* <MudButton StartIcon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditUser(appUsers))" /> *@
+                                <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteUser(appUsers))" /> 
+                            </MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[] { 5, 10, 50, 100, int.MaxValue }" />
+                        </PagerContent>
+                    </MudTable>
+                    </div>
+              
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
+else
+{
+    <AuthenticationErrorPage></AuthenticationErrorPage>
+}
+
+<style>
+    .text-remove {
+        color: red !important;
+    }
+
+    .table-data-alignment {
+        text-align: center
+    }
+</style>
+
+@code {
+
+     [CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+     [Parameter] public UserAddDto user { get; set; } = new UserAddDto();
+
+     private IEnumerable<AppUser> appUsers = new List<AppUser>();
+
+    // private Dictionary<int, string> userRolesDictionary = new Dictionary<int, string>();
+
+    // public bool IsCompleted { get; set; } = false;
+    // private int currentPage = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUser();
+    }
+
+    private async Task LoadUser()
+    {
+        try
+        {
+            Snackbar.Clear();
+            Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopCenter;
+
+            //var userResponse = await HttpClient.GetAsync("
+            // /api/Users/getuser");
+          
+            var userResponse = await HttpClient.GetAsync("https://localhost:7146/api/Users/getuser");
+            if (userResponse.IsSuccessStatusCode)
+            {
+                var userResult = await userResponse.Content.ReadFromJsonAsync<IEnumerable<AppUser>>();
+                if (userResult != null)
+                {
+                    appUsers = userResult.ToList().OrderByDescending(u => u.Id);
+
+                    foreach (var user in appUsers)
+                    {
+                      //  userRolesDictionary[user.Id] = await GetUserRoles(user.Id);
+                    }
+                }
+            }
+            else
+            {
+                Snackbar.Add($"Failed to fetch users: {userResponse.ReasonPhrase}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error Occurred: {ex.Message}", Severity.Warning);
+        }
+    }
+
+
+
+     async Task AddUser()
+     {
+         var options = new DialogOptions { FullWidth = true };
+         var dialog = await DialogService.ShowAsync<AddUserDialog>("Delete Server", DialogSettings.DialogOptionsAddEditDelete);       
+    }
+
+    async Task DeleteUser(AppUser appUser)
+    {
+        var parameters = new DialogParameters { { "appUsers", appUser } };
+        var options = new DialogOptions { FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<DeleteUserDialog>("Delete User", parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled) // Use Canceled as a property, not a method
+        {
+            Snackbar.Add("Deletion canceled.", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add("User deleted successfully.", Severity.Success);
+            await LoadUser(); // Reload the user list after successful deletion
+        }
+    }
+
+
+}

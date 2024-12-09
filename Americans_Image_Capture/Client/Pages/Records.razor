@@ -1,0 +1,74 @@
+﻿@page "/record"
+@using Americans_Image_Capture.Client.Utitlity
+@using Americans_Image_Capture.Shared
+
+@inject HttpClient HttpClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@if (maagAmericansList == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!maagAmericansList.Any())
+{
+    <p><em>No data available.</em></p>
+}
+else
+{
+    <MudTable Items="@maagAmericansList" TItem="MaagAmericansImage" Class="table table-bordered table-striped mt-2">
+        <HeaderContent>
+            <MudTh Style="width:150px;text-align:center">Location</MudTh>
+            <MudTh Style="width:150px;text-align:center">Department</MudTh>
+            <MudTh Style="width:150px;text-align:center">Username</MudTh>
+            <MudTh Style="width:150px;text-align:center">Date</MudTh>
+            <MudTh Style="width:150px;text-align:center">Project/Kent</MudTh>
+            <MudTh Style="width:150px;text-align:center">File Path</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="mp">
+            <MudTd Style="width:150px;text-align:center">@mp.Location</MudTd>
+            <MudTd Style="width:150px;text-align:center">@mp.Department</MudTd>
+            <MudTd Style="width:150px;text-align:center">@mp.Username</MudTd>
+            <MudTd Style="width:150px;text-align:center">@mp.Date?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+            <MudTd Style="width:150px;text-align:center">@mp.ProjectKent</MudTd>
+            <MudTd Style="width:150px;text-align:center">
+                @if (mp.Images != null && mp.Images.Any())
+                {
+                    @string.Join(", ", mp.Images.Select(i => i.ImageFilePath))  <!-- Join paths with commas -->
+                }
+                else
+                {
+                    <span>No files available</span>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<MaagAmericansImage> maagAmericansList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            maagAmericansList = await HttpClient.GetFromJsonAsync<List<MaagAmericansImage>>(ApiConstants.getimageDetails);
+            // Fetch data from API
+           // maagAmericansList = await Http.GetFromJsonAsync<List<MaagAmericansImage>>("https://localhost:7146/api/MaagAmericansImage/getall");
+
+            if (maagAmericansList == null || !maagAmericansList.Any())
+            {
+                Snackbar.Add("No data found.", Severity.Warning);
+                maagAmericansList = new List<MaagAmericansImage>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error fetching data: {ex.Message}", Severity.Error);
+            maagAmericansList = new List<MaagAmericansImage>();
+        }
+    }
+
+    
+}

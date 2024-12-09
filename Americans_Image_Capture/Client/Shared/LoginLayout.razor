@@ -1,0 +1,14 @@
+﻿@inherits LayoutComponentBase
+
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<div class="content" style="overflow:hidden;padding-top: 0;">
+    @Body
+</div>
+
+@code{
+    protected override async Task OnInitializedAsync()
+    {
+        await localStorage.RemoveItemAsync("UserData");
+    }
+}

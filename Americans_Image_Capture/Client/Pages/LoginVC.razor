@@ -1,0 +1,223 @@
+﻿
+@page "/"
+
+@using Americans_Image_Capture.Client.Pages.Account
+@using Americans_Image_Capture.Client.Utitlity
+@using Americans_Image_Capture.Shared.DTOs;
+@using Americans_Image_Capture.Shared.Entities;
+
+@layout LoginLayout
+@inject HttpClient HttpClient
+@inject ISnackbar Snackbar
+@inject NavigationManager NavManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudContainer Class="d-flex justify-center align-content-center" MaxWidth="MaxWidth.ExtraExtraLarge"
+              Style="height:100vh;min-width:100vw;background-image:url('Image/MAAG_BG.png');background-repeat:no-repeat;
+              background-size:cover;background-position:center;">
+    <div class="form-signin align-self-center">
+        <MudPaper Class="d-flex align-self-center" MaxWidth="100%" Width="100%"
+                  Style="margin:25px;background-color:#ffffffc8;border-radius:30px;">
+            <MudGrid Justify="Justify.Center">
+                <MudItem xs="12" sm="12">
+                    <MudCard Style="padding:20px;">
+                        <!-- Logo Section -->
+                        <MudItem Class="d-flex justify-center align-center">
+                            <img src="Image/maaglogo.png" alt="Logo" class="px-4 mt-2 mb-2"
+                                 Style="width:300px;height:50px;" />
+                        </MudItem>
+
+                        <!-- Title Section -->
+                        <MudText Class="shades-text" Typo="Typo.h3" Align="Align.Center"
+                                 Style="font-size:x-large;">
+                            Americans Image Capturing
+                        </MudText>
+                        <br />
+                        <MudCardContent>
+                            <MudTextField MaxLength="250" Immediate="true" Validation="@(new Func<string, IEnumerable<string>>(MaxCharacters))"
+                                          Class="m-2 mb-8 shades-text" id="username" @bind-Value="loginModel.Username" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" @onkeydown="HandleKeyDown"
+                                          For="@(() => loginModel.Username)" Style="background-color:white;"></MudTextField>
+
+                            <MudTextField MaxLength="250" Immediate="true" Validation="@(new Func<string, IEnumerable<string>>(MaxCharacters))"
+                                          Class="m-2 shades-text " id="password" @bind-Value="loginModel.Password" InputType="InputType.Password" Label="Password" Variant="Variant.Outlined" Margin="Margin.Dense" @onkeydown="HandleKeyDown"
+                                          For="@(() => loginModel.Password)" Style="background-color:white"></MudTextField>
+
+                            <MudItem Class="d-flex justify-center align-center mt-6">
+                                <MudButton Class="text-white" ButtonType="ButtonType.Submit" Variant="Variant.Filled" Style="background-color:#ffbe26" @onkeydown="HandleKeyDown"
+                                           OnClick="OnLoginSubmit" StartIcon="@Icons.Material.Filled.Login">Login</MudButton>
+                            </MudItem>
+
+                        </MudCardContent>
+                        
+                        @* @if (islogin)
+                        {
+                            <MudProgressCircular Size="Size.Small" Color="Color.Info" Indeterminate="true" />
+                        } *@
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+    </div>
+
+</MudContainer>
+
+<style>
+    .login-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100px;
+        color:black;
+    }
+
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .btn-login {
+        background-color: #007bff;
+        margin-left: 100px;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+               
+    }
+   
+
+</style>
+
+@code {
+    [Inject]
+    private NavigationManager navigationManager { get; set; }
+
+    private LoginDto loginModel = new LoginDto();
+
+    private string errorMessage = string.Empty;
+    private bool islogin = false;
+
+    private List<string> routePages = new List<string>();
+    private List<UserPagesAndRouter> userPagesPrevlgs = new List<UserPagesAndRouter>();
+
+    private IEnumerable<string> MaxCharacters(string ch)
+    {
+        if (!string.IsNullOrEmpty(ch) && 250 <= ch?.Length)
+            yield return "Max 250 characters";
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await OnLoginSubmit();
+        }
+    }
+
+    private async Task OnLoginSubmit()
+    {
+        Snackbar.Clear();
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopCenter;
+        try
+        {
+            islogin = true;
+            loginModel.Username = loginModel.Username.ToLower();
+           // var response = await HttpClient.PostAsJsonAsync("https://localhost:7146/api/Account/login", loginModel);
+            var response = await HttpClient.PostAsJsonAsync(ApiConstants.AppLogin, loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+               // if (loginModel.Password == "123456")
+                // var ldapResponse = await HttpClient.PostAsJsonAsync("https://localhost:7146/api/Account/login-ldap", loginModel);
+
+                 var ldapResponse = await HttpClient.PostAsJsonAsync(ApiConstants.LDAPLogin, loginModel);
+                  if (ldapResponse.IsSuccessStatusCode)
+                {
+                  //  var userResponse = await HttpClient.GetAsync("https://localhost:7146/api/Users/getuser");
+                    var userResponse = await HttpClient.GetAsync(ApiConstants.GetUser);
+                    if (userResponse.IsSuccessStatusCode)
+                    {
+                        var users = await userResponse.Content.ReadFromJsonAsync<IEnumerable<AppUser>>();
+                        var user = users.FirstOrDefault(u => u.Email.ToLower() == loginModel.Username);
+                        if (user != null)
+                        {
+                            var userPagesPrevlgs = new UserPagesAndRouter
+                                {
+                                    UserId = user.Id,
+                                    UserName = user.UserName,
+                                    UserEmail = user.Email,
+                                    // Pages = user.PageNames != null ? new List<string> { user.PageNames } : null
+                                };
+
+                            // if (user.Routes != null)
+                            // {
+                            //     var routerString = user.Routes;
+                            //     userPagesPrevlgs.SetRouterFromString(routerString);
+                            // }
+
+                            //userPagesPrevlgs.Add(newUserPagesAndRouter);
+
+                            await localStorage.SetItemAsync<UserPagesAndRouter>("UserData", userPagesPrevlgs);
+
+                            var loginDetails = new LoginUserDetailsDTO
+                                {
+                                    UserName = user.UserName,
+                                    EMail = user.Email,
+                                    LoginDateAndTime = DateTime.Now
+                                };
+
+                          //  var loginDetailsResponse = await HttpClient.PostAsJsonAsync("https://localhost:7146/api/users/adduser", loginDetails);
+                            var loginDetailsResponse = await HttpClient.PostAsJsonAsync(ApiConstants.LoginUserDetails, loginDetails);
+                            if (loginDetailsResponse.IsSuccessStatusCode)
+                            {
+                                Console.WriteLine("successfull");
+                            }
+
+
+                            BaseAuthentication.IsAuthenticated = true;
+                            navigationManager.NavigateTo("/index");
+
+                        }
+                    }
+                }
+                else
+                {
+                    Snackbar.Add("Invalid email or password. Please try again!", Severity.Error);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Invalid email or password. Please try again!", Severity.Error);
+            }
+        }
+        catch(Exception ex)
+        {
+            
+        }
+    }
+
+    public class UserPagesAndRouter
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; }
+        public string UserEmail { get; set; }
+        // public IEnumerable<string>? Pages { get; set; }
+        // public List<string>? Router { get; set; } // Change to List<string>
+
+        // public void SetRouterFromString(string routerString)
+        // {
+        //     if (!string.IsNullOrEmpty(routerString))
+        //     {
+        //         Router = routerString.Split(',').Select(route => route.Trim()).ToList(); // Convert to List<string>
+        //     }
+        // }
+    }
+
+}

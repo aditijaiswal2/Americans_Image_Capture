@@ -1,0 +1,17 @@
+﻿@page "/ba"
+@inject NavigationManager Navigation
+
+<h3>BaseAuthentication</h3>
+
+@code {
+    public static bool IsAuthenticated { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var val = IsAuthenticated;
+        if (!BaseAuthentication.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+}

@@ -1,0 +1,94 @@
+﻿@using static Americans_Image_Capture.Client.Pages.LoginVC
+@inherits LayoutComponentBase
+@inject NavigationManager NavManager
+@inject ISnackbar Snackbar
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="@_isDarkMode" Theme="_currentMAAGTheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary" Class="custom-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h6" Class="ml-3">Maag Americans Image Capturing</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Filled.Brightness4"
+                       Color="Color.Inherit"
+                       Class="nav-button"
+                       OnClick="@ThemeToggle" />
+
+        <MudTooltip Text="@($"{loggedInUserName} (Last Login at {loginTime})")">
+            <MudIconButton Icon="@Icons.Material.Filled.Person" Class="person-icon" Color="Color.Inherit" Edge="Edge.End" />
+        </MudTooltip>
+
+        <MudTooltip Text="Logout">
+            <MudIconButton Icon="@Icons.Material.Filled.Logout" OnClick="LogOut" Color="Color.Inherit" Edge="Edge.End" />
+        </MudTooltip>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu></NavMenu>
+    </MudDrawer>
+    <MudMainContent Class="custom-main-content">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool _drawerOpen = true;
+    private bool _isDarkMode = true;
+    private MudThemeProvider _mudThemeProvider;
+    private string loggedInUserName;
+    private string loginTime;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        var userData = await localStorage.GetItemAsync<UserPagesAndRouter>("UserData");
+
+        loggedInUserName = userData?.UserName;
+
+        loginTime = DateTime.Now.ToString("HH:mm:ss");
+
+        StateHasChanged();
+    }
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    void ThemeToggle()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+
+    private readonly MudTheme _currentMAAGTheme = new MudTheme()
+        {
+           
+            PaletteDark = new PaletteDark
+            {
+                Primary = "#ffbe26",
+                Secondary = "#607D8B",
+                Info = "#0096FF",
+                Success = "#4CBB17",
+                Warning = "#E35335",
+                Error = "#FF0000",
+                AppbarBackground = "#ffbe26",
+                TextPrimary = "#fff",
+                TextSecondary = "#fff",
+                Background = "#292929",
+                DrawerBackground = "#292929"
+            }
+        };
+
+
+    private async Task LogOut()
+    {
+        NavManager.NavigateTo("/");
+        Snackbar.Add("Logged Out Successfully.", Severity.Success);
+    }
+
+}
